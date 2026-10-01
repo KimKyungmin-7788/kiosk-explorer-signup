@@ -10,8 +10,8 @@
 
 <!-- 입장 -->
 <main id="entry" class="wrap narrow">
-  <h1>키오스크 생활 탐험대 신청</h1>
-  <p class="muted">교내 실습과 지역사회 실습 일정을 달력에서 직접 신청합니다. 비밀번호는 본인 신청을 삭제할 때만 쓰입니다.</p>
+  <h1>키오스크 수업일정 취합기</h1>
+  <p class="muted">키오스크 생활 탐험대 교내 실습과 지역사회 실습 일정을 달력에서 직접 신청합니다.</p>
   <form id="entryForm" class="card" autocomplete="off">
     <label>교사 이름
       <input id="teacherName" type="text" required maxlength="20">
@@ -19,6 +19,7 @@
     <label>비밀번호 (숫자 4자리)
       <input id="teacherPin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>
     </label>
+    <p class="pin-note">비밀번호를 꼭 기억하세요. 내 신청을 삭제할 때 필요하고, 잊어버리면 직접 삭제할 수 없어요.</p>
     <div class="field-title">참가 학급</div>
     <div id="entryAdder"></div>
     <div id="entryChips" class="chips"></div>
@@ -31,11 +32,11 @@
 <div id="app" hidden>
   <header class="topbar">
     <div class="wrap">
+      <button id="homeBtn" type="button" class="brand">키오스크 수업일정 취합기</button>
       <div class="topbar-row">
         <strong id="meName"></strong>
         <div id="topChips" class="chips"></div>
         <button id="editClassesBtn" type="button">학급 편집</button>
-        <button id="leaveBtn" type="button">나가기</button>
       </div>
       <div id="topAdder" hidden></div>
       <nav class="tabs">
@@ -63,6 +64,17 @@
     <button id="modalClose" class="close" type="button" aria-label="닫기">x</button>
     <h2 id="modalTitle"></h2>
     <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- 나가기 확인 -->
+<div id="leaveModal" class="overlay" hidden>
+  <div class="modal small-modal" role="dialog" aria-modal="true">
+    <p><strong>나가도 기록은 저장됩니다.</strong><br>나가시겠습니까?</p>
+    <div class="btn-row">
+      <button id="leaveCancel" type="button">취소</button>
+      <button id="leaveOk" type="button" class="primary">저장 나가기</button>
+    </div>
   </div>
 </div>
 

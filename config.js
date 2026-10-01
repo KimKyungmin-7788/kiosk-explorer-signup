@@ -1,10 +1,11 @@
 window.APP_CONFIG = {
   SUPABASE_URL: 'https://pbpkoumwdjjciayxpbti.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_Al-2MssElYz-dnvHv9XUvg_wQCvleWp',
-  IN_RANGE: ['2026-10-14', '2026-10-30'],
+  IN_RANGE: ['2026-10-14', '2026-10-28'],
   OUT_RANGE: ['2026-10-14', '2026-10-30'],
   CAL_START: '2026-10-12',
   PERIODS: 7,
+  SPLIT_PERIOD: 4,
   MAX_STUDENTS: 15,
   COURSES: { '초': 6, '중': 3, '고': 3, '전공과': 2 },
   CLASSES_PER_GRADE: 3,

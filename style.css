@@ -42,6 +42,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .topbar .wrap { padding-bottom: 0; }
 .topbar-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .topbar-row .chips { flex: 1; margin: 0; }
+.brand { border: 0; background: none; padding: 0 0 8px; font-size: 18px; font-weight: 800; color: var(--accent); min-height: 0; }
+.brand:hover { background: none; text-decoration: underline; }
+.pin-note { margin: -4px 0 12px; padding: 8px 10px; background: var(--accent-bg); border-radius: 6px; font-size: 14px; color: #145c39; }
+.small-modal { max-width: 360px; }
+.btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+.btn-row .primary { width: auto; }
 .tabs { display: flex; gap: 4px; margin-top: 10px; }
 .tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 8px 14px; }
 .tabs button.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 700; }
