@@ -398,7 +398,7 @@
           joinUnique(list.map((b) => b.subject)), joinUnique(list.map((b) => b.unit)),
           list.map((b) => {
             const [m, d] = md(b.date);
-            const lunch = b.lunch ? `(4교시 ${GROUP_LABEL[b.lunch]})` : '';
+            const lunch = b.lunch ? `(${b.periods.length > 1 ? '4교시 ' : ''}${GROUP_LABEL[b.lunch]})` : '';
             return `${m}월 ${d}일 (${dow(b.date)}, ${periodText(b.periods)}${lunch})`;
           }).join(', ')]
       };
