@@ -1,0 +1,94 @@
+:root {
+  --accent: #1f7a4d;
+  --accent-bg: #e6f3ec;
+  --line: #d9dde1;
+  --text: #1c2126;
+  --muted: #6b7580;
+  --gray-bg: #eef0f2;
+  --err: #b3261e;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Malgun Gothic", sans-serif; color: var(--text); background: #fff; }
+[hidden] { display: none !important; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 16px; }
+.wrap.narrow { max-width: 520px; }
+h1 { font-size: 22px; margin: 8px 0; }
+h2 { font-size: 18px; margin: 0 0 12px; }
+h3 { font-size: 16px; margin: 20px 0 8px; }
+.muted { color: var(--muted); }
+.error { color: var(--err); margin: 8px 0; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+label { display: block; margin-bottom: 12px; font-weight: 600; }
+label > input, label > select { display: block; width: 100%; margin-top: 4px; font-weight: 400; }
+input, select, button { font: inherit; }
+input[type=text], input[type=password], input[type=date], select {
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; min-height: 38px;
+}
+button { padding: 8px 14px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; min-height: 38px; }
+button:hover { background: var(--gray-bg); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; width: 100%; }
+button.primary:hover { background: #17613c; }
+button.small { padding: 2px 10px; min-height: 28px; font-size: 13px; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.field-title { font-weight: 600; margin-bottom: 6px; }
+
+.adder { display: grid; grid-template-columns: repeat(5, 1fr) auto; gap: 6px; align-items: center; margin-bottom: 8px; }
+.adder select { width: 100%; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border: 1px solid var(--accent); background: var(--accent-bg); border-radius: 999px; font-size: 14px; }
+.chip button { border: 0; background: none; padding: 0 2px; min-height: 0; color: var(--muted); }
+
+.topbar { border-bottom: 1px solid var(--line); position: sticky; top: 0; background: #fff; z-index: 5; }
+.topbar .wrap { padding-bottom: 0; }
+.topbar-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.topbar-row .chips { flex: 1; margin: 0; }
+.tabs { display: flex; gap: 4px; margin-top: 10px; }
+.tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 8px 14px; }
+.tabs button.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 700; }
+#topAdder { margin-top: 8px; }
+
+.notice { border: 1px solid var(--line); background: var(--gray-bg); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+
+.cal { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.cal-head { text-align: center; font-weight: 600; padding: 4px 0; font-size: 13px; color: var(--muted); }
+.cell { border: 1px solid var(--line); border-radius: 6px; min-height: 84px; padding: 4px; font-size: 12px; text-align: left; background: #fff; display: block; width: 100%; overflow: hidden; }
+.cell .d { font-weight: 700; display: block; margin-bottom: 2px; }
+.cell.off { background: var(--gray-bg); color: #aab0b6; cursor: not-allowed; }
+.cell.off:hover { background: var(--gray-bg); }
+.cell.on:hover { border-color: var(--accent); background: #fff; }
+.tag { display: block; padding: 1px 4px; margin-top: 2px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--gray-bg); }
+.tag.mine { background: var(--accent-bg); color: #145c39; }
+.legend { color: var(--muted); font-size: 13px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
+.dot.mine { background: var(--accent-bg); border: 1px solid var(--accent); }
+.dot.other { background: var(--gray-bg); border: 1px solid var(--line); }
+
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; padding: 12px; z-index: 20; }
+.modal { background: #fff; border-radius: 10px; padding: 20px; width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto; position: relative; }
+.close { position: absolute; top: 10px; right: 10px; padding: 0; width: 34px; }
+.periods { margin: 8px 0 12px; }
+.period { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 4px; font-weight: 400; margin-bottom: 4px; }
+.period input { width: auto; margin: 0; }
+.period.locked { background: var(--gray-bg); color: var(--muted); }
+.period .who { margin-left: auto; font-size: 13px; color: var(--muted); }
+.rain-periods { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.rain-periods label { margin: 0; font-weight: 400; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; }
+.rain-periods input { display: inline; width: auto; margin: 0 4px 0 0; }
+.mylist { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 10px; }
+.mylist-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 4px 0; }
+
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: var(--gray-bg); white-space: nowrap; }
+.summary { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin-top: 16px; }
+.summary p { margin: 4px 0; }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1c2126; color: #fff; padding: 10px 16px; border-radius: 8px; z-index: 30; max-width: 90vw; }
+
+@media (max-width: 600px) {
+  .adder { grid-template-columns: repeat(2, 1fr); }
+  .adder button { grid-column: span 2; }
+  .cell { min-height: 64px; padding: 2px; }
+  .tabs button { padding: 8px 8px; font-size: 14px; }
+}

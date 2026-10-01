@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>키오스크 생활 탐험대 신청</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 입장 -->
+<main id="entry" class="wrap narrow">
+  <h1>키오스크 생활 탐험대 신청</h1>
+  <p class="muted">교내 실습과 지역사회 실습 일정을 달력에서 직접 신청합니다. 비밀번호는 본인 신청을 삭제할 때만 쓰입니다.</p>
+  <form id="entryForm" class="card" autocomplete="off">
+    <label>교사 이름
+      <input id="teacherName" type="text" required maxlength="20">
+    </label>
+    <label>비밀번호 (숫자 4자리)
+      <input id="teacherPin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required>
+    </label>
+    <div class="field-title">참가 학급</div>
+    <div id="entryAdder"></div>
+    <div id="entryChips" class="chips"></div>
+    <p id="entryError" class="error" hidden></p>
+    <button type="submit" class="primary">입장하기</button>
+  </form>
+</main>
+
+<!-- 앱 -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="wrap">
+      <div class="topbar-row">
+        <strong id="meName"></strong>
+        <div id="topChips" class="chips"></div>
+        <button id="editClassesBtn" type="button">학급 편집</button>
+        <button id="leaveBtn" type="button">나가기</button>
+      </div>
+      <div id="topAdder" hidden></div>
+      <nav class="tabs">
+        <button data-tab="in" type="button">1. 교내 실습</button>
+        <button data-tab="out" type="button">2. 지역사회 실습</button>
+        <button data-tab="report" type="button">현황</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p id="loadError" class="error" hidden></p>
+    <section id="calendarView">
+      <div id="gate" class="notice" hidden></div>
+      <div id="calendar"></div>
+      <p class="legend"><span class="dot mine"></span> 내 신청 <span class="dot other"></span> 다른 선생님 신청</p>
+    </section>
+    <section id="reportView" hidden></section>
+  </main>
+</div>
+
+<!-- 신청 모달 -->
+<div id="modal" class="overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true">
+    <button id="modalClose" class="close" type="button" aria-label="닫기">x</button>
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
