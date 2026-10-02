@@ -201,22 +201,34 @@
 
   // ---------- 달력 ----------
   const myIn = () => state.bookings.filter((b) => b.kind === 'in' && b.teacher === state.me.name);
-  const firstInDate = () => { const l = myIn().map((b) => b.date).sort(); return l[0] || null; };
+  // 첫 교내 실습(날짜가 가장 이르고, 같은 날이면 먼저 시작하는 신청)과 그 마지막 교시
+  const firstInOf = (list) => {
+    const b = [...list].sort((x, y) => x.date.localeCompare(y.date) || Math.min(...x.periods) - Math.min(...y.periods))[0];
+    return b ? { date: b.date, period: Math.max(...b.periods) } : null;
+  };
+  const firstIn = () => firstInOf(myIn());
+  // 지역사회 실습은 첫 교내 실습이 끝난 바로 다음 교시부터
+  const outAllowed = (f, date, p) => !!f && (date > f.date || (date === f.date && p > f.period));
+  const firstInText = (f) => `${md(f.date).join('.')} ${f.period}교시`;
 
   function dateEnabled(kind, date) {
     const [a, b] = rangeOf(kind);
     if (date < a || date > b) return false;
-    if (kind === 'out') { const f = firstInDate(); return !!f && date > f; }
+    if (kind === 'out') return outAllowed(firstIn(), date, C.PERIODS);
     return true;
   }
 
   function renderCalendar() {
     const kind = state.tab;
     const gate = $('gate');
-    const locked = kind === 'out' && !firstInDate();
+    const f = firstIn();
+    const locked = kind === 'out' && !f;
     gate.hidden = !(locked || kind === 'out');
     if (locked) gate.textContent = '교내 실습을 먼저 신청하세요.';
-    else if (kind === 'out') gate.textContent = `교외 실습은 내 첫 교내 실습일(${md(firstInDate()).join('.')}) 이후 날짜만 신청할 수 있어요.`;
+    else if (kind === 'out') {
+      gate.textContent = `지역사회 실습은 내 첫 교내 실습(${firstInText(f)})이 끝난 ` +
+        (f.period < C.PERIODS ? `바로 다음 시간(${md(f.date).join('.')} ${f.period + 1}교시)부터 신청할 수 있어요.` : '다음 날부터 신청할 수 있어요.');
+    }
     renderMyList(kind);
     if (locked) { $('calendar').innerHTML = ''; return; }
 
@@ -395,9 +407,11 @@
           ${p}교시
           ${taken ? `<span class="who">${esc(taken.teacher)} · ${esc(classNames(taken.classes))}</span>` : ''}</label>`;
       } else {
-        const who = using.map((b) => `${b.teacher} · ${b.place || ''}`).join(', ');
-        periodsHtml += `<label class="period">
-          <input type="checkbox" data-p="${p}" ${modalState.periods.has(p) ? 'checked' : ''}>
+        const early = !outAllowed(firstIn(), date, p);
+        if (early) modalState.periods.delete(p);
+        const who = early ? '교내 실습 이후부터 신청' : using.map((b) => `${b.teacher} · ${b.place || ''}`).join(', ');
+        periodsHtml += `<label class="period ${early ? 'locked' : ''}">
+          <input type="checkbox" data-p="${p}" ${early ? 'disabled' : ''} ${modalState.periods.has(p) ? 'checked' : ''}>
           ${p}교시 ${who ? `<span class="who">${esc(who)}</span>` : ''}</label>`;
       }
     }
@@ -507,8 +521,11 @@
     if (kind === 'out') {
       if (!f.place) return showModalError('실습 장소를 입력하세요.');
       if (f.rainDate && f.rainDate < C.OUT_RANGE[0]) return showModalError('우천 시 대체일을 확인하세요.');
+      const fi = firstIn();
+      if ([...modalState.periods].some((p) => !outAllowed(fi, modalDate, p))) {
+        return showModalError(`첫 교내 실습(${fi ? firstInText(fi) : '없음'}) 다음 시간부터 신청할 수 있어요.`);
+      }
     }
-    if (editId && kind === 'in' && !confirmOutOrder(editId, modalDate)) return;
     const payload = {
       kind,
       teacher: state.me.name,
@@ -528,6 +545,7 @@
       payload.rain_date = f.rainDate || '';
       if (modalState.rainPeriods.size) payload.rain_periods = [...modalState.rainPeriods].sort((a, b) => a - b);
     }
+    if (kind === 'in' && !confirmOutOrder(editId, { date: modalDate, periods: payload.periods })) return;
     $('submitBtn').disabled = true;
     const res = editId
       ? await withPin((pin) => db.rpc('update_booking', { bid: editId, pin, p: payload }))
@@ -562,16 +580,17 @@
     return res;
   }
 
-  // 교내 실습을 옮기거나(newDate) 지우면(null) 내 지역사회 실습이 첫 교내 실습일보다 앞서게 되는지 확인
-  function confirmOutOrder(id, newDate) {
-    const ins = myIn().filter((b) => b.id !== id).map((b) => b.date);
-    if (newDate) ins.push(newDate);
-    const first = ins.sort()[0];
-    const bad = state.bookings.filter((b) => b.kind === 'out' && b.teacher === state.me.name && (!first || b.date <= first));
+  // 교내 실습을 새로 넣거나 옮기거나(next) 지우면(null) 내 지역사회 실습이 첫 교내 실습보다 앞서게 되는지 확인
+  function confirmOutOrder(id, next) {
+    const ins = myIn().filter((b) => b.id !== id);
+    if (next) ins.push(next);
+    const first = firstInOf(ins);
+    const bad = state.bookings.filter((b) => b.kind === 'out' && b.teacher === state.me.name &&
+      !outAllowed(first, b.date, Math.min(...b.periods)));
     if (!bad.length) return true;
-    const list = bad.map((b) => { const [m, d] = md(b.date); return `${m}.${d}`; }).join(', ');
+    const list = bad.map((b) => `${md(b.date).join('.')} ${periodText(b.periods)}`).join(', ');
     return confirm(first
-      ? `이렇게 바꾸면 첫 교내 실습일이 ${md(first).join('.')}이 되어, 지역사회 실습(${list})이 교내 실습보다 먼저예요.\n그래도 저장할까요?`
+      ? `이렇게 바꾸면 첫 교내 실습이 ${firstInText(first)}이 되어, 지역사회 실습(${list})이 교내 실습보다 먼저이거나 겹쳐요.\n그래도 저장할까요?`
       : `교내 실습이 하나도 남지 않아, 지역사회 실습(${list})만 남게 돼요.\n그래도 진행할까요?`);
   }
 
