@@ -216,7 +216,7 @@
     const locked = kind === 'out' && !firstInDate();
     gate.hidden = !(locked || kind === 'out');
     if (locked) gate.textContent = '교내 실습을 먼저 신청하세요.';
-    else if (kind === 'out') gate.textContent = `교외 실습은 내 첫 교내 실습일(${md(firstInDate()).join('.')}) 이후 날짜만 신청할 수 있어요. ${C.ITEM_NOTICE}`;
+    else if (kind === 'out') gate.textContent = `교외 실습은 내 첫 교내 실습일(${md(firstInDate()).join('.')}) 이후 날짜만 신청할 수 있어요.`;
     renderMyList(kind);
     if (locked) { $('calendar').innerHTML = ''; return; }
 
@@ -410,7 +410,7 @@
     } else {
       const rainOpts = Array.from({ length: C.PERIODS }, (_, i) => i + 1).map((p) =>
         `<label><input type="checkbox" data-rp="${p}" ${modalState.rainPeriods.has(p) ? 'checked' : ''}>${p}교시</label>`).join('');
-      fields = `<p class="notice">${esc(C.ITEM_NOTICE)}</p>` +
+      fields =
         selectWithCustom('fPlace', C.PLACES, '실습 장소', f.place) +
         companionHtml() +
         `<label>우천 시 대체일<input id="fRainDate" type="date" min="${C.OUT_RANGE[0]}" value="${esc(f.rainDate || '')}"></label>
