@@ -52,37 +52,93 @@
   }
 
   // ---------- 학급 추가 UI ----------
-  function renderAdder(box, onChange) {
-    const courses = Object.keys(C.COURSES);
-    const opts = (n, unit) => Array.from({ length: n }, (_, i) => `<option value="${i + 1}">${i + 1}${unit}</option>`).join('');
+  const COURSE_LIST = Object.keys(C.COURSES);
+  const opts = (n, unit, sel) => Array.from({ length: n }, (_, i) =>
+    `<option value="${i + 1}" ${String(i + 1) === String(sel) ? 'selected' : ''}>${i + 1}${unit}</option>`).join('');
+  const splitName = (name) => { const m = /^(.+?)(\d+)-(\d+)$/.exec(name); return m ? { course: m[1], grade: m[2], cls: m[3] } : {}; };
+
+  // 과정·학년·반·학생 수 선택칸. 학생 수가 비어 있으면 빈 칸으로 시작한다.
+  function classSelects(box, v = {}) {
+    const course = COURSE_LIST.includes(v.course) ? v.course : COURSE_LIST[0];
     box.innerHTML = `
-      <div class="adder">
-        <select data-k="course" aria-label="과정">${courses.map((c) => `<option>${esc(c)}</option>`).join('')}</select>
-        <select data-k="grade" aria-label="학년"></select>
-        <select data-k="cls" aria-label="반">${opts(C.CLASSES_PER_GRADE, '반')}</select>
-        <select data-k="students" aria-label="학생 수">${opts(C.MAX_STUDENTS, '명')}</select>
-        <button type="button" data-k="add">학급 추가</button>
-      </div>`;
+      <select data-k="course" aria-label="과정">${COURSE_LIST.map((c) => `<option ${c === course ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      <select data-k="grade" aria-label="학년"></select>
+      <select data-k="cls" aria-label="반">${opts(C.CLASSES_PER_GRADE, '반', v.cls)}</select>
+      <select data-k="students" aria-label="학생 수">${v.students ? '' : '<option value="">학생 수</option>'}${opts(C.MAX_STUDENTS, '명', v.students)}</select>`;
     const q = (k) => box.querySelector(`[data-k="${k}"]`);
-    const fillGrades = () => { q('grade').innerHTML = opts(C.COURSES[q('course').value], '학년'); };
-    fillGrades();
-    q('course').addEventListener('change', fillGrades);
-    q('add').addEventListener('click', () => {
-      const name = `${q('course').value}${q('grade').value}-${q('cls').value}`;
-      const students = Number(q('students').value);
-      const list = state.draftClasses();
-      const found = list.find((c) => c.name === name);
-      if (found) found.students = students; else list.push({ name, students });
-      onChange(list);
+    const fillGrades = (sel) => { q('grade').innerHTML = opts(C.COURSES[q('course').value], '학년', sel); };
+    fillGrades(v.grade);
+    q('course').addEventListener('change', () => fillGrades());
+    return {
+      q,
+      read: () => ({ name: `${q('course').value}${q('grade').value}-${q('cls').value}`, students: Number(q('students').value) })
+    };
+  }
+
+  // 같은 이름의 학급이 있으면 학생 수만 바꾸고, 없으면 추가한다. skip은 수정 중인 자기 자신.
+  function upsertClass(list, cls, skip = -1) {
+    const dup = list.findIndex((c, i) => i !== skip && c.name === cls.name);
+    if (skip >= 0) {
+      list[skip] = cls;
+      if (dup >= 0) list.splice(dup, 1);
+    } else if (dup >= 0) list[dup].students = cls.students;
+    else list.push(cls);
+  }
+
+  // 학생 수까지 고르면 바로 추가된다
+  function renderAdder(box, onChange) {
+    box.innerHTML = '<div class="adder"></div><p class="hint">과정·학년·반을 고른 뒤 학생 수를 고르면 바로 추가돼요.</p>';
+    const sel = classSelects(box.firstElementChild);
+    sel.q('students').addEventListener('change', () => {
+      if (!sel.q('students').value) return;
+      const cls = sel.read();
+      upsertClass(state.draftClasses(), cls);
+      sel.q('students').value = '';
+      onChange();
+      toast(`${cls.name} ${cls.students}명을 추가했어요.`);
     });
   }
 
-  function renderChips(box, list, onRemove) {
+  function renderChips(box, list, onChange) {
     box.innerHTML = list.map((c, i) =>
-      `<span class="chip">${esc(c.name)} ${c.students}명<button type="button" data-i="${i}" aria-label="${esc(c.name)} 제거">x</button></span>`).join('')
+      `<span class="chip" role="button" tabindex="0" data-edit="${i}" title="눌러서 수정">${esc(c.name)} ${c.students}명<button type="button" data-i="${i}" aria-label="${esc(c.name)} 제거">x</button></span>`).join('')
       || '<span class="muted">담긴 학급이 없습니다.</span>';
-    box.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => onRemove(Number(b.dataset.i))));
+    box.querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      list.splice(Number(b.dataset.i), 1);
+      onChange();
+    }));
+    box.querySelectorAll('[data-edit]').forEach((el) => {
+      const open = () => openClassModal(list, Number(el.dataset.edit), onChange);
+      el.addEventListener('click', open);
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    });
   }
+
+  // ---------- 학급 수정 모달 ----------
+  let classEdit = null;
+  function openClassModal(list, i, onChange) {
+    const c = list[i];
+    const sel = classSelects($('classEditBody'), { ...splitName(c.name), students: c.students });
+    $('classEditBody').classList.add('adder', 'edit');
+    classEdit = { list, i, onChange, sel };
+    $('classModal').hidden = false;
+  }
+  function closeClassModal() { classEdit = null; $('classModal').hidden = true; }
+  $('classSave').addEventListener('click', () => {
+    const { list, i, onChange, sel } = classEdit;
+    upsertClass(list, sel.read(), i);
+    closeClassModal();
+    onChange();
+  });
+  $('classDel').addEventListener('click', () => {
+    const { list, i, onChange } = classEdit;
+    list.splice(i, 1);
+    closeClassModal();
+    onChange();
+  });
+  $('classCancel').addEventListener('click', closeClassModal);
+  $('classModal').addEventListener('click', (e) => { if (e.target === $('classModal')) closeClassModal(); });
 
   // ---------- 입장 ----------
   let entryClasses = [];
@@ -104,7 +160,7 @@
     });
   }
   function initEntryChips() {
-    renderChips($('entryChips'), entryClasses, (i) => { entryClasses.splice(i, 1); initEntryChips(); });
+    renderChips($('entryChips'), entryClasses, initEntryChips);
   }
 
   // ---------- 앱 ----------
@@ -119,7 +175,7 @@
   }
 
   function renderTopChips() {
-    renderChips($('topChips'), state.me.classes, (i) => { state.me.classes.splice(i, 1); saveSession(); renderTopChips(); renderModalIfOpen(); });
+    renderChips($('topChips'), state.me.classes, () => { saveSession(); renderTopChips(); renderModalIfOpen(); });
   }
 
   function setTab(tab) {
@@ -189,13 +245,14 @@
 
   // ---------- 모달 ----------
   let modalDate = null;
-  const modalState = { periods: new Set(), four: null, rainPeriods: new Set(), form: {} };
+  const modalState = { periods: new Set(), four: null, rainPeriods: new Set(), companions: [], form: {} };
 
   function openModal(date) {
     modalDate = date;
     modalState.periods = new Set();
     modalState.four = null;
     modalState.rainPeriods = new Set();
+    modalState.companions = [];
     modalState.form = {};
     $('modal').hidden = false;
     renderModal();
@@ -222,8 +279,34 @@
     if (get('fSubject')) f.subject = readSelectCustom('fSubject');
     if (get('fUnit')) f.unit = get('fUnit').value;
     if (get('fPlace')) f.place = readSelectCustom('fPlace');
-    if (get('fAssistant')) f.assistant = get('fAssistant').value;
+    if (get('fRequest')) f.request = get('fRequest').value;
     if (get('fRainDate')) f.rainDate = get('fRainDate').value;
+    if (get('fCompRole')) { f.compRole = get('fCompRole').value; f.compRoleCustom = get('fCompRoleCustom').value; f.compName = get('fCompName').value; }
+  }
+
+  // 입력칸에 적힌 동행 인솔교사를 목록에 담는다. 이름 없이 역할만 담는 건 추가 버튼(roleOnly)으로만.
+  function addCompanion(roleOnly) {
+    const f = modalState.form;
+    const role = f.compRole === '직접 입력' ? (f.compRoleCustom || '').trim() : f.compRole;
+    const name = (f.compName || '').trim();
+    if (!name && !(roleOnly && role)) return;
+    modalState.companions.push([role, name].filter(Boolean).join(' '));
+    f.compName = ''; f.compRoleCustom = '';
+  }
+
+  function companionHtml() {
+    const f = modalState.form;
+    const role = f.compRole || C.COMPANION_ROLES[0];
+    const list = modalState.companions.map((c, i) =>
+      `<span class="chip">${esc(c)}<button type="button" data-comp-del="${i}" aria-label="${esc(c)} 빼기">x</button></span>`).join('');
+    return `<div class="field-title">동행 인솔교사 <span class="muted">(부담임, 특수교육지도사, 사회복무요원 등)</span></div>
+      <div class="companion">
+        <select id="fCompRole" aria-label="역할">${C.COMPANION_ROLES.map((r) => `<option ${r === role ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>
+        <input id="fCompRoleCustom" type="text" placeholder="역할" value="${esc(f.compRoleCustom || '')}" ${role === '직접 입력' ? '' : 'hidden'}>
+        <input id="fCompName" type="text" placeholder="이름" maxlength="20" value="${esc(f.compName || '')}">
+        <button type="button" id="compAdd">추가</button>
+      </div>
+      <div class="chips">${list || '<span class="muted">없음</span>'}</div>`;
   }
 
   function renderModal() {
@@ -269,14 +352,15 @@
     let fields = '';
     if (kind === 'in') {
       fields = selectWithCustom('fSubject', C.SUBJECTS, '연계 교과', f.subject) +
-        `<label>단원<input id="fUnit" type="text" value="${esc(f.unit || '')}"></label>`;
+        `<label>단원<input id="fUnit" type="text" value="${esc(f.unit || '')}"></label>
+         <label>추가 요청사항 <span class="muted">(선택)</span><textarea id="fRequest" rows="3" maxlength="300" placeholder="예: 휠체어 이용 학생 2명, 결제 카드 추가 준비 등">${esc(f.request || '')}</textarea></label>`;
     } else {
       const rainOpts = Array.from({ length: C.PERIODS }, (_, i) => i + 1).map((p) =>
         `<label><input type="checkbox" data-rp="${p}" ${modalState.rainPeriods.has(p) ? 'checked' : ''}>${p}교시</label>`).join('');
       fields = `<p class="notice">${esc(C.ITEM_NOTICE)}</p>` +
         selectWithCustom('fPlace', C.PLACES, '실습 장소', f.place) +
-        `<label>보조 인솔교사<input id="fAssistant" type="text" value="${esc(f.assistant || '')}"></label>
-         <label>우천 시 대체일<input id="fRainDate" type="date" min="${C.OUT_RANGE[0]}" value="${esc(f.rainDate || '')}"></label>
+        companionHtml() +
+        `<label>우천 시 대체일<input id="fRainDate" type="date" min="${C.OUT_RANGE[0]}" value="${esc(f.rainDate || '')}"></label>
          <div class="field-title">우천 시 대체 교시</div><div class="rain-periods">${rainOpts}</div>` +
         selectWithCustom('fSubject', C.SUBJECTS, '관련 교과', f.subject);
     }
@@ -307,6 +391,16 @@
       const p = Number(el.dataset.rp);
       if (el.checked) modalState.rainPeriods.add(p); else modalState.rainPeriods.delete(p);
     }));
+    if ($('compAdd')) {
+      $('compAdd').addEventListener('click', () => { captureForm(); addCompanion(true); renderModal(); $('fCompName').focus(); });
+      $('fCompName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('compAdd').click(); } });
+      $('fCompRole').addEventListener('change', () => { $('fCompRoleCustom').hidden = $('fCompRole').value !== '직접 입력'; });
+      body.querySelectorAll('[data-comp-del]').forEach((el) => el.addEventListener('click', () => {
+        captureForm();
+        modalState.companions.splice(Number(el.dataset.compDel), 1);
+        renderModal();
+      }));
+    }
     ['fSubject', 'fPlace'].forEach((id) => {
       const sel = $(id);
       if (sel) sel.addEventListener('change', () => { $(id + 'Custom').hidden = sel.value !== '직접 입력'; });
@@ -339,10 +433,14 @@
       periods: [...modalState.periods, ...(four ? [C.SPLIT_PERIOD] : [])].sort((a, b) => a - b),
       subject: f.subject || null
     };
-    if (kind === 'in') { payload.unit = f.unit || null; if (four) payload.lunch = four; }
-    else {
+    if (kind === 'in') {
+      payload.unit = f.unit || null;
+      payload.request = (f.request || '').trim() || null;
+      if (four) payload.lunch = four;
+    } else {
+      addCompanion(false);
       payload.place = f.place;
-      payload.assistant = (f.assistant || '').trim() || null;
+      payload.assistant = modalState.companions.join(', ') || null;
       payload.rain_date = f.rainDate || '';
       if (modalState.rainPeriods.size) payload.rain_periods = [...modalState.rainPeriods].sort((a, b) => a - b);
     }
@@ -400,7 +498,8 @@
             const [m, d] = md(b.date);
             const lunch = b.lunch ? `(${b.periods.length > 1 ? '4교시 ' : ''}${GROUP_LABEL[b.lunch]})` : '';
             return `${m}월 ${d}일 (${dow(b.date)}, ${periodText(b.periods)}${lunch})`;
-          }).join(', ')]
+          }).join(', '),
+          joinUnique(list.map((b) => b.request))]
       };
     }).sort((a, b) => a.first.localeCompare(b.first));
 
@@ -425,8 +524,8 @@
     };
   }
 
-  const IN_HEAD = ['구분', '교사명', '학급', '학생수', '연계 교과', '단원', '운영 날짜'];
-  const OUT_HEAD = ['구분', '교사', '보조 인솔교사', '학급', '학생수', '실습장소', '운영 날짜, 시간', '우천 시', '관련 교과'];
+  const IN_HEAD = ['구분', '교사명', '학급', '학생수', '연계 교과', '단원', '운영 날짜', '추가 요청사항'];
+  const OUT_HEAD = ['구분', '교사', '동행 인솔교사', '학급', '학생수', '실습장소', '운영 날짜, 시간', '우천 시', '관련 교과'];
   const won = (n) => n.toLocaleString('ko-KR') + '원';
 
   function tableHtml(head, rows) {

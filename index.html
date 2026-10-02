@@ -43,6 +43,7 @@
         <button data-tab="in" type="button">1. 교내 실습</button>
         <button data-tab="out" type="button">2. 지역사회 실습</button>
         <button data-tab="report" type="button">현황</button>
+        <p class="flow-note"><b>교내 실습</b>을 먼저 신청하고, 이어서 <b>지역사회 실습</b>을 신청해 주세요.</p>
       </nav>
     </div>
   </header>
@@ -64,6 +65,20 @@
     <button id="modalClose" class="close" type="button" aria-label="닫기">x</button>
     <h2 id="modalTitle"></h2>
     <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- 학급 수정 -->
+<div id="classModal" class="overlay" hidden>
+  <div class="modal small-modal" role="dialog" aria-modal="true">
+    <h2>학급 수정</h2>
+    <div id="classEditBody"></div>
+    <div class="btn-row">
+      <button id="classDel" type="button" class="danger">삭제</button>
+      <span class="spacer"></span>
+      <button id="classCancel" type="button">취소</button>
+      <button id="classSave" type="button" class="primary">저장</button>
+    </div>
   </div>
 </div>
 
