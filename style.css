@@ -75,7 +75,22 @@ button.danger { color: var(--err); border-color: #e3b3b0; }
 .cell.off:hover { background: var(--gray-bg); }
 .cell.on:hover { border-color: var(--accent); background: #fff; }
 .tag { display: block; padding: 1px 4px; margin-top: 2px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--gray-bg); }
-.tag.mine { background: var(--accent-bg); color: #145c39; }
+.tag.mine { background: var(--accent-bg); color: #145c39; cursor: pointer; border: 1px solid transparent; }
+.tag.mine:hover { border-color: var(--accent); }
+.tag.mine:hover::before { content: '✎ '; }
+.tag.flash { animation: flash 1.6s ease-out 2; }
+@keyframes flash { 0% { background: #ffd966; } 100% { background: var(--accent-bg); } }
+.cell.on { cursor: pointer; }
+.cell.on:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.mybar { border: 1px solid var(--accent); background: #f6fbf8; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; }
+.mybar-title { font-weight: 700; margin-bottom: 4px; color: #145c39; }
+.mybar-title .muted { font-weight: 400; font-size: 13px; }
+.mybar-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px dashed var(--line); }
+.mybar-btns { display: inline-flex; gap: 4px; flex-shrink: 0; }
+.edit-banner { margin: 0 0 12px; padding: 8px 12px; background: #fff5dc; border: 1px solid #f0c36d; border-radius: 6px; color: #7a4b00; font-size: 14px; }
+.edit-btns { margin-top: 8px; }
+#editAdder .adder { margin-bottom: 2px; }
 .legend { color: var(--muted); font-size: 13px; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
 .dot.mine { background: var(--accent-bg); border: 1px solid var(--accent); }

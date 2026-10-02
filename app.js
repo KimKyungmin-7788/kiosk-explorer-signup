@@ -86,13 +86,13 @@
   }
 
   // 학생 수까지 고르면 바로 추가된다
-  function renderAdder(box, onChange) {
+  function renderAdder(box, getList, onChange) {
     box.innerHTML = '<div class="adder"></div><p class="hint">과정·학년·반을 고른 뒤 학생 수를 고르면 바로 추가돼요.</p>';
     const sel = classSelects(box.firstElementChild);
     sel.q('students').addEventListener('change', () => {
       if (!sel.q('students').value) return;
       const cls = sel.read();
-      upsertClass(state.draftClasses(), cls);
+      upsertClass(getList(), cls);
       sel.q('students').value = '';
       onChange();
       toast(`${cls.name} ${cls.students}명을 추가했어요.`);
@@ -143,8 +143,7 @@
   // ---------- 입장 ----------
   let entryClasses = [];
   function initEntry() {
-    state.draftClasses = () => entryClasses;
-    renderAdder($('entryAdder'), initEntryChips);
+    renderAdder($('entryAdder'), () => entryClasses, initEntryChips);
     initEntryChips();
     $('entryForm').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -168,8 +167,7 @@
     $('entry').hidden = true;
     $('app').hidden = false;
     $('meName').textContent = `${state.me.name} 선생님`;
-    state.draftClasses = () => state.me.classes;
-    renderAdder($('topAdder'), () => { saveSession(); renderTopChips(); renderModalIfOpen(); });
+    renderAdder($('topAdder'), () => state.me.classes, () => { saveSession(); renderTopChips(); renderModalIfOpen(); });
     renderTopChips();
     setTab('in');
   }
@@ -219,6 +217,7 @@
     gate.hidden = !(locked || kind === 'out');
     if (locked) gate.textContent = '교내 실습을 먼저 신청하세요.';
     else if (kind === 'out') gate.textContent = `교외 실습은 내 첫 교내 실습일(${md(firstInDate()).join('.')}) 이후 날짜만 신청할 수 있어요. ${C.ITEM_NOTICE}`;
+    renderMyList(kind);
     if (locked) { $('calendar').innerHTML = ''; return; }
 
     const last = rangeOf(kind)[1];
@@ -233,19 +232,49 @@
             const mine = b.teacher === state.me.name;
             const place = kind === 'out' && b.place ? ' ' + b.place.slice(0, 2) : '';
             const text = `${b.teacher} ${[...b.periods].sort((p, q) => p - q).join('·')}${place}`;
-            return `<span class="tag ${mine ? 'mine' : ''}">${esc(text)}</span>`;
+            return mine
+              ? `<span class="tag mine ${b.id === state.flashId ? 'flash' : ''}" data-edit-id="${b.id}" title="눌러서 수정">${esc(text)}</span>`
+              : `<span class="tag">${esc(text)}</span>`;
           }).join('');
         const [m, d] = md(date);
-        html += `<button type="button" class="cell ${on ? 'on' : 'off'}" data-date="${date}" ${on ? '' : 'disabled'}><span class="d">${m}.${d}</span>${on ? items : ''}</button>`;
+        html += `<div class="cell ${on ? 'on' : 'off'}" data-date="${date}" ${on ? 'role="button" tabindex="0"' : ''}><span class="d">${m}.${d}</span>${on ? items : ''}</div>`;
       }
     }
+    state.flashId = null;
     $('calendar').innerHTML = html + '</div>';
-    $('calendar').querySelectorAll('.cell.on').forEach((c) => c.addEventListener('click', () => openModal(c.dataset.date)));
+    $('calendar').querySelectorAll('.cell.on').forEach((c) => {
+      c.addEventListener('click', () => openModal(c.dataset.date));
+      c.addEventListener('keydown', (e) => { if (e.target === c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openModal(c.dataset.date); } });
+    });
+    $('calendar').querySelectorAll('[data-edit-id]').forEach((t) => t.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEdit(t.dataset.editId);
+    }));
+  }
+
+  const sortBookings = (list) => list.sort((a, b) => a.date.localeCompare(b.date) || Math.min(...a.periods) - Math.min(...b.periods));
+  const bookingLabel = (b) => { const [m, d] = md(b.date); return `${m}.${d}(${dow(b.date)}) ${periodText(b.periods)}${b.lunch ? `(${GROUP_LABEL[b.lunch]})` : ''}`; };
+
+  // 달력 위 '내 신청' 목록: 날짜를 몰라도 여기서 바로 수정·삭제
+  function renderMyList(kind) {
+    const box = $('myList');
+    const mine = sortBookings(state.bookings.filter((b) => b.kind === kind && b.teacher === state.me.name));
+    box.hidden = !mine.length;
+    if (!mine.length) { box.innerHTML = ''; return; }
+    box.innerHTML = `<div class="mybar-title">내 ${kind === 'in' ? '교내' : '지역사회'} 실습 신청 ${mine.length}건 <span class="muted">· 달력의 초록 칸을 눌러도 수정할 수 있어요</span></div>` +
+      mine.map((b) => `<div class="mybar-row">
+        <span><b>${esc(bookingLabel(b))}</b> · ${esc(classNames(b.classes))}${kind === 'out' && b.place ? ' · ' + esc(b.place) : ''}</span>
+        <span class="mybar-btns"><button type="button" class="small" data-my-edit="${b.id}">수정</button><button type="button" class="small danger" data-my-del="${b.id}">삭제</button></span>
+      </div>`).join('');
+    box.querySelectorAll('[data-my-edit]').forEach((el) => el.addEventListener('click', () => openEdit(el.dataset.myEdit)));
+    box.querySelectorAll('[data-my-del]').forEach((el) => el.addEventListener('click', () => removeBooking(el.dataset.myDel)));
   }
 
   // ---------- 모달 ----------
   let modalDate = null;
-  const modalState = { periods: new Set(), four: null, rainPeriods: new Set(), companions: [], form: {} };
+  // editId가 있으면 수정 모드. 수정 모드의 학급은 그 신청에 담긴 학급(editClasses)이다.
+  const modalState = { periods: new Set(), four: null, rainPeriods: new Set(), companions: [], form: {}, editId: null, editClasses: [] };
+  const activeClasses = () => (modalState.editId ? modalState.editClasses : state.me.classes);
 
   function openModal(date) {
     modalDate = date;
@@ -254,11 +283,30 @@
     modalState.rainPeriods = new Set();
     modalState.companions = [];
     modalState.form = {};
+    modalState.editId = null;
+    modalState.editClasses = [];
     $('modal').hidden = false;
     renderModal();
   }
-  function closeModal() { modalDate = null; $('modal').hidden = true; }
-  function renderModalIfOpen() { if (modalDate) renderModal(); }
+
+  function openEdit(id) {
+    const b = state.bookings.find((x) => x.id === id);
+    if (!b) return;
+    modalDate = b.date;
+    modalState.editId = b.id;
+    modalState.editClasses = b.classes.map((c) => ({ ...c }));
+    modalState.four = b.kind === 'in' && b.lunch ? b.lunch : null;
+    modalState.periods = new Set(b.periods.filter((p) => !(modalState.four && p === C.SPLIT_PERIOD)));
+    modalState.rainPeriods = new Set(b.rain_periods || []);
+    modalState.companions = b.assistant ? b.assistant.split(', ').filter(Boolean) : [];
+    modalState.form = { subject: b.subject || '', unit: b.unit || '', request: b.request || '', place: b.place || '', rainDate: b.rain_date || '' };
+    $('modal').hidden = false;
+    renderModal();
+  }
+
+  function closeModal() { modalDate = null; modalState.editId = null; $('modal').hidden = true; }
+  // 다시 그릴 때 입력 중이던 값이 사라지지 않게 먼저 담아 둔다
+  function renderModalIfOpen() { if (modalDate) { captureForm(); renderModal(); } }
 
   function selectWithCustom(id, list, label, value) {
     const known = list.includes(value) ? value : (value ? '직접 입력' : list[0]);
@@ -313,10 +361,13 @@
     const kind = state.tab;
     const date = modalDate;
     const f = modalState.form;
+    const editing = !!modalState.editId;
+    const myClasses = activeClasses();
     const [m, d] = md(date);
-    $('modalTitle').textContent = `${m}월 ${d}일 (${dow(date)}) ${kind === 'in' ? '교내 실습' : '지역사회 실습'} 신청`;
+    $('modalTitle').textContent = `${m}월 ${d}일 (${dow(date)}) ${kind === 'in' ? '교내 실습' : '지역사회 실습'} ${editing ? '신청 수정' : '신청'}`;
 
-    const dayBookings = state.bookings.filter((b) => b.kind === kind && b.date === date);
+    // 수정 중인 신청 자신은 '이미 찬 교시'로 치지 않는다
+    const dayBookings = state.bookings.filter((b) => b.kind === kind && b.date === date && b.id !== modalState.editId);
     const mine = dayBookings.filter((b) => b.teacher === state.me.name);
 
     // 교시 목록
@@ -327,8 +378,9 @@
         // 점심 교차 운영: 4교시는 고전/초중이 서로 다른 시간이라 따로 신청
         ['jg', 'cj'].forEach((g) => {
           const taken = using.find((b) => b.lunch === g);
-          const mismatch = !taken && state.me.classes.length && !state.me.classes.some((c) => classGroup(c.name) === g);
+          const mismatch = !taken && myClasses.length && !myClasses.some((c) => classGroup(c.name) === g);
           const off = !!taken || mismatch;
+          if (off && modalState.four === g) modalState.four = null;
           periodsHtml += `<label class="period ${off ? 'locked' : ''}">
             <input type="checkbox" data-four="${g}" ${off ? 'disabled' : ''} ${modalState.four === g ? 'checked' : ''}>
             ${p}교시(${GROUP_LABEL[g]})
@@ -337,6 +389,7 @@
         });
       } else if (kind === 'in') {
         const taken = using[0];
+        if (taken) modalState.periods.delete(p);
         periodsHtml += `<label class="period ${taken ? 'locked' : ''}">
           <input type="checkbox" data-p="${p}" ${taken ? 'disabled' : ''} ${modalState.periods.has(p) ? 'checked' : ''}>
           ${p}교시
@@ -365,19 +418,47 @@
         selectWithCustom('fSubject', C.SUBJECTS, '관련 교과', f.subject);
     }
 
-    const names = state.me.classes.map((c) => c.name).join(', ');
-    const mineHtml = mine.length ? `<div class="mylist"><div class="field-title">내 신청</div>${mine.map((b) =>
-      `<div class="mylist-row"><span>${periodText(b.periods)} · ${esc(classNames(b.classes))}</span><button type="button" class="small" data-del="${b.id}">삭제</button></div>`).join('')}</div>` : '';
+    const names = classNames(myClasses);
+    const mineHtml = !editing && mine.length ? `<div class="mylist"><div class="field-title">이날 내 신청</div>${mine.map((b) =>
+      `<div class="mylist-row"><span>${periodText(b.periods)} · ${esc(classNames(b.classes))}</span><span class="mybar-btns"><button type="button" class="small" data-bedit="${b.id}">수정</button><button type="button" class="small danger" data-del="${b.id}">삭제</button></span></div>`).join('')}</div>` : '';
+
+    // 수정 모드: 날짜 바꾸기 + 이 신청의 학급
+    let editTop = '';
+    if (editing) {
+      const [a, z] = rangeOf(kind);
+      const dates = [];
+      for (let x = a; x <= z; x = addDays(x, 1)) if (x === date || (dateEnabled(kind, x) && parse(x).getUTCDay() % 6)) dates.push(x);
+      editTop = `<p class="edit-banner">✎ 수정 중이에요. 내용을 고친 뒤 <b>수정 저장</b>을 누르세요.</p>
+        <label>날짜<select id="fDate">${dates.map((x) => { const [mm, dd] = md(x); return `<option value="${x}" ${x === date ? 'selected' : ''}>${mm}월 ${dd}일 (${dow(x)})</option>`; }).join('')}</select></label>
+        <div class="field-title">학급 <span class="muted">(이 신청에만 적용)</span></div>
+        <div id="editChips" class="chips"></div>
+        <div id="editAdder"></div>`;
+    }
 
     $('modalBody').innerHTML = `
+      ${editTop}
       <div class="field-title">교시 선택</div>
       <div class="periods">${periodsHtml}</div>
       ${fields}
       <p id="modalError" class="error" hidden></p>
-      <button type="button" id="submitBtn" class="primary">${names ? esc(names) + ' 신청하기' : '신청하기'}</button>
+      ${editing
+        ? `<div class="btn-row edit-btns">
+            <button type="button" id="editDel" class="danger">삭제</button><span class="spacer"></span>
+            <button type="button" id="editCancel">취소</button>
+            <button type="button" id="submitBtn" class="primary">수정 저장</button></div>`
+        : `<button type="button" id="submitBtn" class="primary">${names ? esc(names) + ' 신청하기' : '신청하기'}</button>`}
       ${mineHtml}`;
 
     const body = $('modalBody');
+    if (editing) {
+      const rerender = () => { captureForm(); renderModal(); };
+      renderChips($('editChips'), modalState.editClasses, rerender);
+      renderAdder($('editAdder'), () => modalState.editClasses, rerender);
+      $('fDate').addEventListener('change', () => { captureForm(); modalDate = $('fDate').value; renderModal(); });
+      $('editDel').addEventListener('click', () => removeBooking(modalState.editId));
+      $('editCancel').addEventListener('click', closeModal);
+    }
+    body.querySelectorAll('[data-bedit]').forEach((el) => el.addEventListener('click', () => openEdit(el.dataset.bedit)));
     body.querySelectorAll('[data-p]').forEach((el) => el.addEventListener('change', () => {
       const p = Number(el.dataset.p);
       if (el.checked) modalState.periods.add(p); else modalState.periods.delete(p);
@@ -415,20 +496,23 @@
     captureForm();
     const kind = state.tab;
     const f = modalState.form;
-    if (!state.me.classes.length) return showModalError('학급을 먼저 추가하세요. (상단 학급 편집)');
+    const editId = modalState.editId;
+    const classes = activeClasses();
+    if (!classes.length) return showModalError(editId ? '학급을 하나 이상 담으세요.' : '학급을 먼저 추가하세요. (상단 학급 편집)');
     const four = kind === 'in' ? modalState.four : null;
     if (!modalState.periods.size && !four) return showModalError('교시를 하나 이상 선택하세요.');
-    if (four && !state.me.classes.every((c) => classGroup(c.name) === four)) {
+    if (four && !classes.every((c) => classGroup(c.name) === four)) {
       return showModalError(`4교시(${GROUP_LABEL[four]})에는 ${GROUP_LABEL[four]} 학급만 신청할 수 있어요. 담긴 학급을 확인하세요.`);
     }
     if (kind === 'out') {
       if (!f.place) return showModalError('실습 장소를 입력하세요.');
       if (f.rainDate && f.rainDate < C.OUT_RANGE[0]) return showModalError('우천 시 대체일을 확인하세요.');
     }
+    if (editId && kind === 'in' && !confirmOutOrder(editId, modalDate)) return;
     const payload = {
       kind,
       teacher: state.me.name,
-      classes: state.me.classes,
+      classes,
       date: modalDate,
       periods: [...modalState.periods, ...(four ? [C.SPLIT_PERIOD] : [])].sort((a, b) => a - b),
       subject: f.subject || null
@@ -445,35 +529,62 @@
       if (modalState.rainPeriods.size) payload.rain_periods = [...modalState.rainPeriods].sort((a, b) => a - b);
     }
     $('submitBtn').disabled = true;
-    const { error } = await db.rpc('add_booking', { p: payload, pin: state.me.pin });
+    const res = editId
+      ? await withPin((pin) => db.rpc('update_booking', { bid: editId, pin, p: payload }))
+      : await db.rpc('add_booking', { p: payload, pin: state.me.pin });
+    if (!res) { $('submitBtn').disabled = false; return; }
+    const { data, error } = res;
     if (error) {
       $('submitBtn').disabled = false;
       if ((error.message || '').includes('PERIOD_TAKEN')) {
         toast('방금 다른 선생님이 신청한 교시예요. 달력을 새로 불러왔어요.');
-        modalState.periods = new Set();
-        modalState.four = null;
+        if (!editId) { modalState.periods = new Set(); modalState.four = null; }
         await load();
         return;
       }
       return showModalError('저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
     }
-    toast('신청했어요.');
+    if (editId && !data) { $('submitBtn').disabled = false; return showModalError('비밀번호가 맞지 않아요.'); }
+    toast(editId ? '수정했어요.' : '신청했어요.');
+    state.flashId = editId || data;
     closeModal();
     await load();
   }
 
-  async function removeBooking(id) {
-    if (!confirm('이 신청을 삭제할까요?')) return;
-    let pin = state.me.pin;
-    let { data, error } = await db.rpc('delete_booking', { bid: id, pin });
-    if (!error && !data) {
-      pin = prompt('비밀번호 4자리를 입력하세요.');
-      if (!pin) return;
-      ({ data, error } = await db.rpc('delete_booking', { bid: id, pin }));
+  // 입장 비밀번호로 먼저 해 보고, 그 비밀번호로 만든 신청이 아니면(false) 다시 묻는다. 취소하면 null.
+  async function withPin(call) {
+    let res = await call(state.me.pin);
+    if (!res.error && !res.data) {
+      const pin = prompt('이 신청을 만들 때 쓴 비밀번호 4자리를 입력하세요.');
+      if (!pin) return null;
+      res = await call(pin);
     }
-    if (error) return toast('삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
-    if (!data) return toast('비밀번호가 맞지 않아요.');
+    return res;
+  }
+
+  // 교내 실습을 옮기거나(newDate) 지우면(null) 내 지역사회 실습이 첫 교내 실습일보다 앞서게 되는지 확인
+  function confirmOutOrder(id, newDate) {
+    const ins = myIn().filter((b) => b.id !== id).map((b) => b.date);
+    if (newDate) ins.push(newDate);
+    const first = ins.sort()[0];
+    const bad = state.bookings.filter((b) => b.kind === 'out' && b.teacher === state.me.name && (!first || b.date <= first));
+    if (!bad.length) return true;
+    const list = bad.map((b) => { const [m, d] = md(b.date); return `${m}.${d}`; }).join(', ');
+    return confirm(first
+      ? `이렇게 바꾸면 첫 교내 실습일이 ${md(first).join('.')}이 되어, 지역사회 실습(${list})이 교내 실습보다 먼저예요.\n그래도 저장할까요?`
+      : `교내 실습이 하나도 남지 않아, 지역사회 실습(${list})만 남게 돼요.\n그래도 진행할까요?`);
+  }
+
+  async function removeBooking(id) {
+    const b = state.bookings.find((x) => x.id === id);
+    if (!confirm(`${b ? bookingLabel(b) + ' ' : ''}신청을 삭제할까요?`)) return;
+    if (b && b.kind === 'in' && !confirmOutOrder(id, null)) return;
+    const res = await withPin((pin) => db.rpc('delete_booking', { bid: id, pin }));
+    if (!res) return;
+    if (res.error) return toast('삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    if (!res.data) return toast('비밀번호가 맞지 않아요.');
     toast('삭제했어요.');
+    if (modalState.editId === id) closeModal();
     await load();
   }
 
